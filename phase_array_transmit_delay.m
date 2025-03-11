@@ -1,7 +1,7 @@
 function emit_delay = phase_array_transmit_delay(probe, angle_rad, F, c)
     
-    xx = F*sin(angle_rad);
-    zz = F*cos(angle_rad);
+    xx = F * sin(angle_rad);
+    zz = F * cos(angle_rad);
     yy = 0 * xx;
 
     focus_point = [xx; yy; zz];
@@ -14,7 +14,7 @@ function emit_delay = phase_array_transmit_delay(probe, angle_rad, F, c)
     L = sqrt(sum((aperture_positions - focus_point).^2, 2));
 
     emit_delay = 5e-6 - (L - F) / c;
-
+    emit_delay = emit_delay';
 end
 
 
