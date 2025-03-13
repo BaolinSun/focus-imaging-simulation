@@ -9,4 +9,10 @@ classdef Probe
         ele_pos
         tx_ori
     end
+
+    methods
+        function obj = Probe(probe_type)
+            obj.type = probe_type;
+        end
+    end
 end

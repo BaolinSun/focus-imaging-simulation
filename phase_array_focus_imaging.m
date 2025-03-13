@@ -10,8 +10,7 @@ addpath('utils')
 addpath("probe")
 
 %% 相控阵探头参数
-probe = Probe();
-probe.type = 'phase aray';
+probe = Probe('phase array');
 f0 = 2.5e6;              % 中心频率 3.5 MHz
 element_num = 64;        % 阵元数量
 height = 5e-3;           % 阵元高度 (m)
@@ -69,8 +68,8 @@ point_position(6,:) = [0 0 60e-3];
 point_position(7,:) = [0 0 70e-3];
 point_position(8,:) = [0 0 80e-3];
 point_position(9,:) = [0 0 90e-3];
-point_position(10,:) = [0 0 10e-3];
-point_position(11,:) = [0 0 11e-3];
+point_position(10,:) = [0 0 100e-3];
+point_position(11,:) = [0 0 110e-3];
 
 point_position(12,:) = [-50e-3 0 40e-3];
 point_position(13,:) = [-40e-3 0 40e-3];
@@ -80,7 +79,7 @@ point_position(16,:) = [-10e-3 0 40e-3];
 point_position(17,:) = [10e-3 0 40e-3];
 point_position(18,:) = [20e-3 0 40e-3];
 point_position(19,:) = [30e-3 0 40e-3];
-point_position(20,:) = [30e-3 0 40e-3];
+point_position(20,:) = [40e-3 0 40e-3];
 point_position(21,:) = [50e-3 0 40e-3];
 
 point_amplitudes = ones(size(point_position,1),1);
@@ -187,7 +186,7 @@ img_grid_x = img_grid_x(:);
 img_grid_y = img_grid(:, :, 3);
 img_grid_y = img_grid_y(:);
 bimgsc = griddata(grid_x, grid_y, das(:), img_grid_x, img_grid_y, 'linear');
-% bimgsc(isnan(bimgsc)) = 1e-20;
+bimgsc(isnan(bimgsc)) = 1e-24;
 bimg = reshape(bimgsc, size(img_grid, 1), size(img_grid, 2));
 
 bimg = abs(bimg);

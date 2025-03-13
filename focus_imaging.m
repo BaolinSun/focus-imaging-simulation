@@ -5,8 +5,7 @@ field_init(-1);
 wavetype = 'fcous_wave'; %plane_wave, diverging_wave, fcous_wave
 
 %% 探头参数
-probe = Probe();
-probe.type = 'linear';
+probe = Probe('linear array');
 c = 1540;
 f0 = 2500000;
 N_elements = 64;
