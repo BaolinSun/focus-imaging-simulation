@@ -5,6 +5,10 @@ clear all; close all;
 path(path, 'D:\MyProjects\matlab\Field_II_ver_3_30_windows');
 field_init(-1);
 
+%% 子函数路径
+addpath('utils')
+addpath("probe")
+
 %% 相控阵探头参数
 probe = Probe();
 probe.type = 'phase aray';
@@ -197,21 +201,6 @@ colormap('gray');
 axis('image');
 xlabel('Lateral distance [mm]');
 ylabel('Axis distance [mm]');
-
-
-
-% env = abs((das))';
-% log_env=20*log10(env);
-% log_env=log_env-max(max(log_env)) + 60;
-% log_env=256*log_env/60;
-
-% x_axis = x_ele * 1000;
-% z_axis = r * 1000;
-% image(x_axis, z_axis, log_env);
-% xlabel('Lateral distance [mm]');
-% ylabel('Axial distance [mm]');
-% axis('image');
-% colormap(gray(256));
 
 
 
