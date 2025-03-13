@@ -29,6 +29,7 @@ probe.y_ele = z_ele;
 probe.z_ele = z_ele;
 probe.ele_pos = [x_ele; z_ele; z_ele]';
 
+
 %% 创建相控阵探头（发射和接收分开定义）
 % 发射探头：设置发射聚焦和偏转
 Th = xdc_linear_array(element_num, width, height, kerf, 1, 10, [0 0 focus]);
@@ -55,26 +56,44 @@ set_sampling(fs);
 set_field('c', c);
 
 %% 生成散射点
-point_position(1,:) = [0 0 20e-3];
-point_position(2,:) = [0 0 30e-3];
-point_position(3,:) = [-5e-3 0 30e-3];
-point_position(4,:) = [5e-3 0 30e-3];
-point_position(5,:) = [0 0 40e-3];
-point_position(5,:) = [0 0 150e-3];
+point_position(1,:) = [0 0 10e-3];
+point_position(2,:) = [0 0 20e-3];
+point_position(3,:) = [0 0 30e-3];
+point_position(4,:) = [0 0 40e-3];
+point_position(5,:) = [0 0 50e-3];
+point_position(6,:) = [0 0 60e-3];
+point_position(7,:) = [0 0 70e-3];
+point_position(8,:) = [0 0 80e-3];
+point_position(9,:) = [0 0 90e-3];
+point_position(10,:) = [0 0 10e-3];
+point_position(11,:) = [0 0 11e-3];
+
+point_position(12,:) = [-50e-3 0 40e-3];
+point_position(13,:) = [-40e-3 0 40e-3];
+point_position(14,:) = [-30e-3 0 40e-3];
+point_position(15,:) = [-20e-3 0 40e-3];
+point_position(16,:) = [-10e-3 0 40e-3];
+point_position(17,:) = [10e-3 0 40e-3];
+point_position(18,:) = [20e-3 0 40e-3];
+point_position(19,:) = [30e-3 0 40e-3];
+point_position(20,:) = [30e-3 0 40e-3];
+point_position(21,:) = [50e-3 0 40e-3];
+
 point_amplitudes = ones(size(point_position,1),1);
 
 %% 扇扫参数设置
 F = 120e-3;
 % scan_angle_deg = -30:2:30;
-scan_angle_deg = linspace(-45, 45, 64);
-num_lines = length(scan_angle_deg);
-rf_data_multi = cell(1, num_lines); % 存储每条扫描线的多阵元原始数据
+angles = linspace(-45, 45, 64);
+theta = deg2rad(angles);
+num_line = length(angles);
+raw_data = cell(1, num_line); % 存储每条扫描线的多阵元原始数据
+tstart = zeros(num_line);
 
 %% 主循环：逐角度发射，记录各阵元原始回波
-for line = 1:num_lines
+for line = 1:num_line
     % --- 发射设置：聚焦与偏转 ---
-    angle_deg = scan_angle_deg(line);
-    angle_rad = angle_deg * pi/180;
+    angle_rad = theta(line);
     
     % 发射延时
     emit_delay = phase_array_transmit_delay(probe, angle_rad, F, c);
@@ -86,11 +105,12 @@ for line = 1:num_lines
     xdc_apodization(Rh, 0, ones(1, element_num));  % 接收孔径全开
     xdc_focus_times(Rh, 0, zeros(1, element_num)); % 接收延迟设为0（禁用聚焦）
     
-    [rf_multi, t_start] = calc_scat_multi(Th, Rh, point_position, point_amplitudes);
-    % rf_multi 结构：[时间采样点 × 接收阵元]
+    [rf_multi, t_start] = calc_scat_multi(Th, Rh, point_position, point_amplitudes); % rf_multi 结构：[时间采样点 × 接收阵元]
+    
     
     % 存储数据（需确保时间轴对齐）
-    rf_data_multi{line} = rf_multi;
+    raw_data{line} = rf_multi;
+    tstart(line) = t_start;
 end
 
 %% 关闭探头并清理内存
@@ -99,29 +119,126 @@ xdc_free(Rh);
 field_end;
 
 %% 保存rfdata为csv文件
-for i = 1:num_lines
-    rfdata = rf_data_multi{i};
-    writematrix(rfdata, ['rfdata\rfdata_1_', num2str(i), '.csv'])
-end
+% for i = 1:num_line
+%     rfdata = raw_data{i};
+%     writematrix(rfdata, ['rfdata\rfdata_1_', num2str(i), '.csv'])
+% end
 
 
 %% 接收波束合成
+rx_num_line = 64;
+parallel_beam = rx_num_line / num_line;
+
+ele_pos = probe.ele_pos;
+
+oris = zeros(rx_num_line, 3);
+oris(:, 1) = linspace(0, rx_num_line - 1, rx_num_line) * pitch * 64.0 / rx_num_line;
+oris(:, 1) = oris(:, 1) - mean(oris(:, 1));
+tx_ori = oris;
+
+rx_dir = [theta; zeros(size(theta))]';
+
+rmax = 158e-3;
+rlims = [0, rmax];
+wvln = c / f0;
+dr = wvln / 4;
+r = rlims(1) : dr : rlims(2);
+grid = make_foctx_grid(rlims, dr, rx_dir);
+grid_s = size(grid);
+nx = grid_s(1);
+nz = grid_s(2);
+das = zeros(nx, nz);
+foc = zeros(rx_num_line, nz);
+
+hann_window = hann(element_num);
+
+for i = 1:rx_num_line
+    data_line = ceil(i / parallel_beam);
+    data = raw_data{i}';
+    data = data .* hann_window;
+
+    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';
+    rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';
+    delays = ((txdel + rxdel) / c - tstart(data_line)) * fs;
+
+    for j = 1 : element_num
+        xc = 1 : size(data, 2);
+        foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
+    end
+
+    das(i, :) = sum(foc);
+end
+
+%% Scan convert
+xlims = rlims(2) * [-0.7, 0.7];
+zlims = rlims(2) * [0, 1];
+img_grid = make_pixel_grid(xlims, zlims, wvln / 2, wvln / 2);
+
+grid_x = grid(:, :, 1);
+grid_x = grid_x(:);
+grid_y = grid(:, :, 3);
+grid_y = grid_y(:);
+img_grid_x = img_grid(:, :, 1);
+img_grid_x = img_grid_x(:);
+img_grid_y = img_grid(:, :, 3);
+img_grid_y = img_grid_y(:);
+bimgsc = griddata(grid_x, grid_y, das(:), img_grid_x, img_grid_y, 'linear');
+% bimgsc(isnan(bimgsc)) = 1e-20;
+bimg = reshape(bimgsc, size(img_grid, 1), size(img_grid, 2));
+
+bimg = abs(bimg);
+bimg = 20 * log10(bimg);
+bimg = bimg - max(max(bimg)) + 60;
+bimg = 256 * bimg / 60;
+drange = 40;
+extent = [img_grid(1, 1, 1), img_grid(1, end, 1), img_grid(1, 1, 3), img_grid(end, 1, 3)] * 1e3;
+image([extent(1), extent(2)], [extent(3), extent(4)], bimg);
+colormap('gray');
+axis('image');
+xlabel('Lateral distance [mm]');
+ylabel('Axis distance [mm]');
+
+
+
+% env = abs((das))';
+% log_env=20*log10(env);
+% log_env=log_env-max(max(log_env)) + 60;
+% log_env=256*log_env/60;
+
+% x_axis = x_ele * 1000;
+% z_axis = r * 1000;
+% image(x_axis, z_axis, log_env);
+% xlabel('Lateral distance [mm]');
+% ylabel('Axial distance [mm]');
+% axis('image');
+% colormap(gray(256));
 
 
 
 
-
-
-%% 自定义局部函数
-
+%% Generate a focused pixel grid based on input parameters
 function grid = make_foctx_grid(rlims, dr, dirs)
 
     r = rlims(1) : dr : rlims(2);
     t = dirs(:, 1);
     [tt, rr] = meshgrid(t, r);
+    rr = rr';
+    tt = tt';
 
     xx = rr .* sin(tt);
     zz = rr .* cos(tt);
+    yy = zeros(size(xx));
+
+    grid = cat(3, xx, yy, zz);
+end
+
+%% Generate a Cartesian pixel grid based on input parameters.
+function grid = make_pixel_grid(xlims, zlims, dx, dz)
+
+    x = xlims(1):dx:xlims(2);
+    z = zlims(1):dz:zlims(2);
+
+    [xx, zz] = meshgrid(x, z);
     yy = zeros(size(xx));
 
     grid = cat(3, xx, yy, zz);
