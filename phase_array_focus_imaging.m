@@ -192,18 +192,20 @@ bimgsc = griddata(grid_x, grid_y, das(:), img_grid_x, img_grid_y, 'linear');
 bimgsc(isnan(bimgsc)) = 1e-22;
 bimg = reshape(bimgsc, size(img_grid, 1), size(img_grid, 2));
 
+drange = 60;
 bimg = abs(bimg);
 bimg = 20 * log10(bimg);
-bimg = bimg - max(max(bimg)) + 60;
-bimg = 256 * bimg / 60;
-drange = 40;
+bimg = bimg - max(bimg(:));
 extent = [img_grid(1, 1, 1), img_grid(1, end, 1), img_grid(1, 1, 3), img_grid(end, 1, 3)] * 1e3;
-image([extent(1), extent(2)], [extent(3), extent(4)], bimg);
-colormap('gray');
-axis('image');
+figure;
+imagesc(extent([1 2]), extent([3 4]), bimg);
+colormap gray;
+caxis([-drange 0]);
+% set(gca, 'YDir', 'normal');
 xlabel('Lateral distance [mm]');
 ylabel('Axis distance [mm]');
-
+axis image;
+colorbar;
 
 
 
