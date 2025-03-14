@@ -158,7 +158,7 @@ hann_window = hann(element_num);
 for i = 1:rx_num_line
     data_line = ceil(i / parallel_beam);
     data = raw_data{i}';
-    data = data .* hann_window;
+    % data = data .* hann_window;
 
     txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';
     rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';
@@ -168,6 +168,9 @@ for i = 1:rx_num_line
         xc = 1 : size(data, 2);
         foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
     end
+
+    apods = apod_focus(grid(i, :, :), ele_pos, 1);
+    foc = foc .* apods;
 
     das(i, :) = sum(foc);
 end
@@ -186,7 +189,7 @@ img_grid_x = img_grid_x(:);
 img_grid_y = img_grid(:, :, 3);
 img_grid_y = img_grid_y(:);
 bimgsc = griddata(grid_x, grid_y, das(:), img_grid_x, img_grid_y, 'linear');
-bimgsc(isnan(bimgsc)) = 1e-24;
+bimgsc(isnan(bimgsc)) = 1e-22;
 bimg = reshape(bimgsc, size(img_grid, 1), size(img_grid, 2));
 
 bimg = abs(bimg);
@@ -230,4 +233,28 @@ function grid = make_pixel_grid(xlims, zlims, dx, dz)
     yy = zeros(size(xx));
 
     grid = cat(3, xx, yy, zz);
+end
+
+%% Compute rect apodization to user-defined pixels for desired f-number
+function apod = apod_focus(grid, ele_pos, fnum)
+
+    min_width = 1e-3;
+
+    ppos = reshape(grid, [1, size(grid, 2), 3]);
+    epos = reshape(ele_pos, [size(ele_pos, 1), 1, 3]);
+
+    v = ppos - epos;
+    v_x = v(:, :, 1);
+    v_z = v(:, :, 3);
+
+    mask_part1 = abs(v_z ./ v_x) >= fnum;    % 动态孔径条件
+    mask_part2 = abs(v_x) <= min_width;      % 最小孔径条件
+
+    mask = mask_part1 | mask_part2;
+
+    element_num = size(ele_pos, 1);
+    hamming_win = hamming(element_num);
+    win = repmat(hamming_win, 1, size(grid, 1));
+
+    apod = mask .* win;
 end
