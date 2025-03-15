@@ -160,13 +160,14 @@ for i = 1:rx_num_line
     data = raw_data{i}';
     % data = data .* hann_window;
 
-    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';
-    rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';
+    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3)   (1x3)
+    rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';   % (1026x1x3)   (1x64x3)
     delays = ((txdel + rxdel) / c - tstart(data_line)) * fs;
 
+    xc = 1 : size(data, 2);
     for j = 1 : element_num
-        xc = 1 : size(data, 2);
-        foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
+        analytic_signal = hilbert(data(j, :));
+        foc(j, :) = interp1(xc, analytic_signal, delays(j, :), 'linear', 0.0);
     end
 
     apods = apod_focus(grid(i, :, :), ele_pos, 1);

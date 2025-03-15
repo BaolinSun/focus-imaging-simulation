@@ -91,9 +91,10 @@ for i = 1:rx_num_line
     rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';
     delays = ((txdel + rxdel) / c - tstart(data_line)) * fs;
 
+    xc = 1 : size(data, 2);
     for j = 1 : element_num
-        xc = 1 : size(data, 2);
-        foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
+        analytic_signal = hilbert(data(j, :));
+        foc(j, :) = interp1(xc, analytic_signal, delays(j, :), 'linear', 0.0);
     end
 
     apods = apod_focus(grid(i, :, :), ele_pos, 1);
