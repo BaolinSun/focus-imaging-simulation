@@ -91,7 +91,7 @@ angles = linspace(-45, 45, 64);
 theta = deg2rad(angles);
 num_line = length(angles);
 raw_data = cell(1, num_line); % 存储每条扫描线的多阵元原始数据
-tstart = zeros(num_line);
+tstart = zeros(1, num_line);
 
 %% 主循环：逐角度发射，记录各阵元原始回波
 for line = 1:num_line
@@ -155,13 +155,17 @@ foc = zeros(rx_num_line, nz);
 
 hann_window = hann(element_num);
 
+segment_length = 256;
+cutoff_freq = 1e6;
+n = 70;
+
 for i = 1:rx_num_line
     data_line = ceil(i / parallel_beam);
     data = raw_data{i}';
     % data = data .* hann_window;
 
-    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3)   (1x3)
-    rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';   % (1026x1x3)   (1x64x3)
+    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3) - (1x3)
+    rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';   % (1026x1x3) - (1x64x3)
     delays = ((txdel + rxdel) / c - tstart(data_line)) * fs;
 
     xc = 1 : size(data, 2);
@@ -173,42 +177,23 @@ for i = 1:rx_num_line
     apods = apod_focus(grid(i, :, :), ele_pos, 1);
     foc = foc .* apods;
 
-    % das(i, :) = sum(foc);
+    beamdata = sum(foc);
 
-    tdata = sum(foc);
+    demod_freq = f0;
+    t = (0:length(beamdata)-1) * Ts;
+    I = beamdata .* cos(2*pi*demod_freq*t);
+    Q = beamdata .* sin(2*pi*demod_freq*t);
 
-    N = size(tdata, 2);
-
-    mag = abs(fft(tdata));
-    m = size(mag,2);
-    [p k] = max(mag(1:fix(m/2)));
-    w = -2 * pi * k/N * fs;
-    x = (0:N-1) / fs;
-    I = cos(w*x).*tdata;
-    Q = sin(w*x).*tdata;
-
-    % demod_freq = f0;
-    % t = (0:length(tdata)-1) * Ts;
-    % I = tdata .* cos(2*pi*demod_freq*t);
-    % Q = tdata .* sin(2*pi*demod_freq*t);
-
-    % T = 1/20000;
-    % f = 100;
-    % wn = 2*T*f*1.001;  
-    % n = 70;
-    % fir = fir1(n,wn);
-
-    cutoff_freq = 1.5e6;
-    wn = cutoff_freq / (fs/2); % 归一化截止频率
-    n = 70;                 % 滤波器阶数
-    fir = fir1(n, wn, 'low'); % 设计低通滤波器
+    cutoff_freq = 3e6;
+    wn = cutoff_freq / (fs/2);
+    n = 70;
+    fir = fir1(n, wn, 'low');
 
     If = fftfilt(fir,I);
     Qf = fftfilt(fir,Q);
+
     Fdata = sqrt(If.^2 + Qf.^2);
-
     das(i, :) = Fdata;
-
 end
 
 %% Scan convert
@@ -242,57 +227,3 @@ xlabel('Lateral distance [mm]');
 ylabel('Axis distance [mm]');
 axis image;
 % colorbar;
-
-
-
-%% Generate a focused pixel grid based on input parameters
-function grid = make_foctx_grid(rlims, dr, dirs)
-
-    r = rlims(1) : dr : rlims(2);
-    t = dirs(:, 1);
-    [tt, rr] = meshgrid(t, r);
-    rr = rr';
-    tt = tt';
-
-    xx = rr .* sin(tt);
-    zz = rr .* cos(tt);
-    yy = zeros(size(xx));
-
-    grid = cat(3, xx, yy, zz);
-end
-
-%% Generate a Cartesian pixel grid based on input parameters.
-function grid = make_pixel_grid(xlims, zlims, dx, dz)
-
-    x = xlims(1):dx:xlims(2);
-    z = zlims(1):dz:zlims(2);
-
-    [xx, zz] = meshgrid(x, z);
-    yy = zeros(size(xx));
-
-    grid = cat(3, xx, yy, zz);
-end
-
-%% Compute rect apodization to user-defined pixels for desired f-number
-function apod = apod_focus(grid, ele_pos, fnum)
-
-    min_width = 1e-3;
-
-    ppos = reshape(grid, [1, size(grid, 2), 3]);
-    epos = reshape(ele_pos, [size(ele_pos, 1), 1, 3]);
-
-    v = ppos - epos;
-    v_x = v(:, :, 1);
-    v_z = v(:, :, 3);
-
-    mask_part1 = abs(v_z ./ v_x) >= fnum;    % 动态孔径条件
-    mask_part2 = abs(v_x) <= min_width;      % 最小孔径条件
-
-    mask = mask_part1 | mask_part2;
-
-    element_num = size(ele_pos, 1);
-    hamming_win = hamming(element_num);
-    win = repmat(hamming_win, 1, size(grid, 1));
-
-    apod = mask .* win;
-end

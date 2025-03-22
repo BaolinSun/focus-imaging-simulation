@@ -42,7 +42,7 @@ angles = linspace(-45, 45, 64);
 theta = deg2rad(angles);
 num_line = length(angles);
 raw_data = cell(1, num_line); % 存储每条扫描线的多阵元原始数据
-tstart = zeros(num_line);
+tstart = zeros(1, num_line);
 
 
 %% 读取csv文件
@@ -71,7 +71,7 @@ rx_dir = [theta; zeros(size(theta))]';
 rmax = 158e-3;
 rlims = [0, rmax];
 wvln = c / f0;
-dr = wvln / 4;
+dr = wvln / 10;
 r = rlims(1) : dr : rlims(2);
 grid = make_foctx_grid(rlims, dr, rx_dir);
 grid_s = size(grid);
@@ -81,6 +81,10 @@ das = zeros(nx, nz);
 foc = zeros(rx_num_line, nz);
 
 hann_window = hann(element_num);
+
+segment_length = 256;
+cutoff_freq = 1e6;
+n = 70;
 
 for i = 1:rx_num_line
     data_line = ceil(i / parallel_beam);
@@ -93,14 +97,50 @@ for i = 1:rx_num_line
 
     xc = 1 : size(data, 2);
     for j = 1 : element_num
-        analytic_signal = hilbert(data(j, :));
-        foc(j, :) = interp1(xc, analytic_signal, delays(j, :), 'linear', 0.0);
+        % analytic_signal = hilbert(data(j, :));
+        foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
     end
 
     apods = apod_focus(grid(i, :, :), ele_pos, 1);
     foc = foc .* apods;
 
-    das(i, :) = sum(foc);
+    beamdata = sum(foc);
+
+    num_segments = ceil(length(beamdata) / segment_length);
+    If = zeros(size(beamdata));
+    Qf = zeros(size(beamdata));
+
+    for seg = 1:num_segments
+        start_idx = (seg-1)*segment_length + 1;
+        end_idx = min(seg*segment_length, length(beamdata));
+
+        tdata = beamdata(start_idx:end_idx);
+        mag = abs(fft(tdata));
+        m = size(mag,2);
+        [p k] = max(mag(1:fix(m/2)));
+        w = 2 * pi * k/m * fs;
+        x = (0:m-1) / fs;
+        I = cos(w*x).*tdata;
+        Q = sin(w*x).*tdata;        
+
+        % 计算当前段的平均深度
+        wn = cutoff_freq / (fs/2);
+        fir = fir1(n, wn, 'low', hamming(n+1));
+
+        delay = floor(n/2);
+        If_seg = fftfilt(fir, [I, zeros(1, delay)]); % 补零避免截断
+        Qf_seg = fftfilt(fir, [Q, zeros(1, delay)]);
+
+        % 存储滤波结果（跳过前delay个点）
+        stored_start = start_idx + delay;
+        stored_end = min(end_idx + delay, length(If));
+        valid_length = stored_end - stored_start + 1;
+        If(stored_start:stored_end) = If_seg(delay+1:delay+valid_length);
+        Qf(stored_start:stored_end) = Qf_seg(delay+1:delay+valid_length);
+    end
+
+    Fdata = sqrt(If.^2 + Qf.^2);
+    das(i, :) = Fdata;
 end
 
 %% Scan convert
@@ -138,55 +178,3 @@ axis image;
 
 
 
-
-%% Generate a focused pixel grid based on input parameters
-function grid = make_foctx_grid(rlims, dr, dirs)
-
-    r = rlims(1) : dr : rlims(2);
-    t = dirs(:, 1);
-    [tt, rr] = meshgrid(t, r);
-    rr = rr';
-    tt = tt';
-
-    xx = rr .* sin(tt);
-    zz = rr .* cos(tt);
-    yy = zeros(size(xx));
-
-    grid = cat(3, xx, yy, zz);
-end
-
-%% Generate a Cartesian pixel grid based on input parameters.
-function grid = make_pixel_grid(xlims, zlims, dx, dz)
-
-    x = xlims(1):dx:xlims(2);
-    z = zlims(1):dz:zlims(2);
-
-    [xx, zz] = meshgrid(x, z);
-    yy = zeros(size(xx));
-
-    grid = cat(3, xx, yy, zz);
-end
-
-%% Compute rect apodization to user-defined pixels for desired f-number
-function apod = apod_focus(grid, ele_pos, fnum)
-
-    min_width = 1e-3;
-
-    ppos = reshape(grid, [1, size(grid, 2), 3]);
-    epos = reshape(ele_pos, [size(ele_pos, 1), 1, 3]);
-
-    v = ppos - epos;
-    v_x = v(:, :, 1);
-    v_z = v(:, :, 3);
-
-    mask_part1 = abs(v_z ./ v_x) >= fnum;    % 动态孔径条件
-    mask_part2 = abs(v_x) <= min_width;      % 最小孔径条件
-
-    mask = mask_part1 | mask_part2;
-
-    element_num = size(ele_pos, 1);
-    hamming_win = hamming(element_num);
-    win = repmat(hamming_win, 1, size(grid, 1));
-
-    apod = mask .* win;
-end
