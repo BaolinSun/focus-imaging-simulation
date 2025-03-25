@@ -134,10 +134,7 @@ parallel_beam = rx_num_line / num_line;
 
 ele_pos = probe.ele_pos;
 
-oris = zeros(rx_num_line, 3);
-oris(:, 1) = linspace(0, rx_num_line - 1, rx_num_line) * pitch * 64.0 / rx_num_line;
-oris(:, 1) = oris(:, 1) - mean(oris(:, 1));
-tx_ori = oris;
+tx_ori = zeros(rx_num_line, 3);
 
 rx_dir = [theta; zeros(size(theta))]';
 
