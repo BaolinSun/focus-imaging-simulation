@@ -122,10 +122,11 @@ xdc_free(Rh);
 field_end;
 
 %% 保存rfdata为csv文件
-% for i = 1:num_line
-%     rfdata = raw_data{i};
-%     writematrix(rfdata, ['rfdata\rfdata_1_', num2str(i), '.csv'])
-% end
+for i = 1:num_line
+    rfdata = raw_data{i};
+    writematrix(rfdata, ['rfdata\rfdata_1_', num2str(i), '.csv'])
+end
+writematrix(tstart, 'rfdata\tstart.csv');
 
 
 %% 接收波束合成
@@ -161,7 +162,8 @@ for i = 1:rx_num_line
     data = raw_data{i}';
     % data = data .* hann_window;
 
-    txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3) - (1x3)
+    % txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3) - (1x3)
+    txdel = sqrt(sum((squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :))).^2, 2))';   % (1026x3) - (1x3)
     rxdel = sqrt(sum((reshape(grid(i, :, :), [], 1, 3) - reshape(ele_pos, [1, size(ele_pos)])).^2, 3))';   % (1026x1x3) - (1x64x3)
     delays = ((txdel + rxdel) / c - tstart(data_line)) * fs;
 
