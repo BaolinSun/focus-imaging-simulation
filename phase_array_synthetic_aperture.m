@@ -46,15 +46,17 @@ tstart = zeros(1, num_line);
 
 %% 读取csv文件
 for i = 1:num_line
-    rfdata = readmatrix(['rfdata\rfdata_1_', num2str(i), '.csv']);
+    rfdata = readmatrix(['rawdata\rfdata\rfdata_1_', num2str(i), '.csv']);
     % rfdata = (rfdata - 512) / 512;
     rfdata = bandpass_filter(rfdata);
     traw_data{i} = rfdata;
     raw_data{1}{i} = rfdata(:, 1:32);
     raw_data{2}{i} = rfdata(:, 33:end);
+
+    tstart(i) = 0;
 end
 
-tstart = readmatrix('rfdata\tstart.csv');
+% tstart = readmatrix('rfdata\tstart.csv');
 
 
 %% 接收波束合成
@@ -167,7 +169,7 @@ bimgsc = griddata(grid_x, grid_y, das(:), img_grid_x, img_grid_y, 'linear');
 bimgsc(isnan(bimgsc)) = 1e-22;
 bimg = reshape(bimgsc, size(img_grid, 1), size(img_grid, 2));
 
-drange = 60;
+drange = 50;
 bimg = abs(bimg);
 bimg = 20 * log10(bimg);
 bimg = bimg - max(bimg(:));
