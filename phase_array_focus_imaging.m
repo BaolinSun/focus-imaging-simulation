@@ -151,7 +151,7 @@ nz = grid_s(2);
 das = zeros(nx, nz);
 foc = zeros(rx_num_line, nz);
 
-hann_window = hann(element_num);
+hamming_win = hamming(element_num);
 
 segment_length = 256;
 cutoff_freq = 1e6;
@@ -160,7 +160,6 @@ n = 70;
 for i = 1:rx_num_line
     data_line = ceil(i / parallel_beam);
     data = raw_data{i}';
-    % data = data .* hann_window;
 
     % txdel = vecnorm(squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :)), 2, 2)';   % (1026x3) - (1x3)
     txdel = sqrt(sum((squeeze(grid(i, :, :)) - squeeze(tx_ori(i, :, :))).^2, 2))';   % (1026x3) - (1x3)
@@ -173,7 +172,7 @@ for i = 1:rx_num_line
         foc(j, :) = interp1(xc, data(j, :), delays(j, :), 'linear', 0.0);
     end
 
-    apods = apod_focus(grid(i, :, :), ele_pos, 1);
+    apods = apod_focus(grid(i, :, :), ele_pos, 1, hamming_win);
     foc = foc .* apods;
 
     beamdata = sum(foc);

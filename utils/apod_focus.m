@@ -1,5 +1,5 @@
 %% Compute rect apodization to user-defined pixels for desired f-number
-function apod = apod_focus(grid, ele_pos, fnum)
+function apod = apod_focus(grid, ele_pos, fnum, hamming_win)
 
     min_width = 1e-3;
 
@@ -15,9 +15,7 @@ function apod = apod_focus(grid, ele_pos, fnum)
 
     mask = mask_part1 | mask_part2;
 
-    element_num = size(ele_pos, 1);
-    hamming_win = hamming(element_num);
-    win = repmat(hamming_win, 1, size(grid, 1));
+    win = repmat(hamming_win, 1, size(grid, 2));
 
     apod = mask .* win;
 end
