@@ -11,15 +11,15 @@ addpath("probe")
 
 %% 相控阵探头参数
 probe = Probe('phase array');
-f0 = 2.5e6;              % 中心频率 3.5 MHz
+f0 = 3e6;              % 中心频率 3.5 MHz
 element_num = 64;        % 阵元数量
 height = 5e-3;           % 阵元高度 (m)
-width = 0.12e-3;         % 阵元宽度 (m)
-kerf = 0.18e-3;          % 阵元间距 (m)
-pitch = width + kerf;
+width = 0.214e-3;         % 阵元宽度 (m)
+kerf = 0.04e-3;          % 阵元间距 (m)
+pitch = 0.254e-3;
 focus = 60e-3;           % 发射聚焦深度 (m)
 c = 1540;                % 声速 (m/s)
-fs = 20e6;              % 采样频率 (Hz)
+fs = 100e6;              % 采样频率 (Hz)
 Ts = 1/fs;               % 采样间隔 (s)
 
 % 阵元参数
@@ -59,30 +59,7 @@ set_sampling(fs);
 set_field('c', c);
 
 %% 生成散射点
-point_position(1,:) = [0 0 10e-3];
-point_position(2,:) = [0 0 20e-3];
-point_position(3,:) = [0 0 30e-3];
-point_position(4,:) = [0 0 40e-3];
-point_position(5,:) = [0 0 50e-3];
-point_position(6,:) = [0 0 60e-3];
-point_position(7,:) = [0 0 70e-3];
-point_position(8,:) = [0 0 80e-3];
-point_position(9,:) = [0 0 90e-3];
-point_position(10,:) = [0 0 100e-3];
-point_position(11,:) = [0 0 110e-3];
-
-point_position(12,:) = [-50e-3 0 40e-3];
-point_position(13,:) = [-40e-3 0 40e-3];
-point_position(14,:) = [-30e-3 0 40e-3];
-point_position(15,:) = [-20e-3 0 40e-3];
-point_position(16,:) = [-10e-3 0 40e-3];
-point_position(17,:) = [10e-3 0 40e-3];
-point_position(18,:) = [20e-3 0 40e-3];
-point_position(19,:) = [30e-3 0 40e-3];
-point_position(20,:) = [40e-3 0 40e-3];
-point_position(21,:) = [50e-3 0 40e-3];
-
-point_amplitudes = ones(size(point_position,1),1);
+[point_position, point_amplitudes] = point_phantom();
 
 %% 扇扫参数设置
 F = 120e-3;
@@ -95,11 +72,15 @@ tstart = zeros(num_line);
 
 %% 主循环：逐角度发射，记录各阵元原始回波
 for line = 1:num_line
+    disp(['process line ',num2str(line)]);
     % --- 发射设置：聚焦与偏转 ---
     angle_rad = theta(line);
     
     % 发射延时
     emit_delay = phase_array_transmit_delay(probe, angle_rad, F, c);
+%     focus_point = [angle_rad, F];
+%     [delay_s,delay_clk] = us_calc_tx_delay(element_num, fs, c, pitch, focus_point);
+%     emit_delay = delay_s;
     
     xdc_apodization(Th, 0, ones(1, element_num)); % 发射孔径全开
     xdc_focus_times(Th, 0, emit_delay); % 应用发射延迟
@@ -109,7 +90,6 @@ for line = 1:num_line
     xdc_focus_times(Rh, 0, zeros(1, element_num)); % 接收延迟设为0（禁用聚焦）
     
     [rf_multi, t_start] = calc_scat_multi(Th, Rh, point_position, point_amplitudes); % rf_multi 结构：[时间采样点 × 接收阵元]
-    
     
     % 存储数据（需确保时间轴对齐）
     raw_data{line} = rf_multi;
