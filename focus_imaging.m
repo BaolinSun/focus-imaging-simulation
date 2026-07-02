@@ -1,3 +1,5 @@
+% focus_imaging.m differs from phase_array_focus_imaging only in the use of actual rf data
+
 %% 相控阵探头参数
 f0 = 4.0e6;              % 中心频率 3.5 MHz
 element_num = 64;        % 阵元数量
@@ -35,7 +37,7 @@ tstart = zeros(num_line,1);
 
 
 for i = 1:64
-    rfdata = readmatrix(['rfdata\rfdata_1_', num2str(i), '.csv']);
+    rfdata = readmatrix(['D:\MyProjects\py_prj\py_test\log\rfdata_4.0MHz\rfdata_', num2str(i), '.csv']);
 %     rfdata = (rfdata - 512) ;
     
     rfdata = bandpass_filter(rfdata);
